@@ -24,7 +24,7 @@ __author__ = "Cyril Jaquier"
 __copyright__ = "Copyright (c) 2004 Cyril Jaquier"
 __license__ = "GPL"
 
-import unittest, calendar, datetime, re, pprint
+import unittest, calendar, datetime, re, pprint, time
 from fail2ban.server.datedetector import DateDetector
 from fail2ban.server.datetemplate import DateTemplate
 from fail2ban.tests.utils import setUpMyTime, tearDownMyTime
@@ -125,6 +125,47 @@ class DateDetectorTest(unittest.TestCase):
 		self.assertEqual(
 			self.__datedetector.getTime('2012/10/11 02:37:17 [error] 18434#0')[:6],
 			m1)
+
+	def testNearNowTemplate(self):
+		"""Using {Day-Month,Month-Day}-Year H:M:S"""
+		setUpMyTime(time.mktime(datetime.datetime(2005, 1, 12).timetuple()))
+		self.assertEqual(
+			self.__datedetector.getTime("12-01-2005 00:00:00")[:3],
+			[2005, 1, 12])
+		self.assertEqual(
+			self.__datedetector.getTime("01-12-2005 00:00:00")[:3],
+			[2005, 1, 12])
+		setUpMyTime(time.mktime(datetime.datetime(2005, 12, 1).timetuple()))
+		self.assertEqual(
+			self.__datedetector.getTime("12-01-2005 00:00:00")[:3],
+			[2005, 12, 1])
+		self.assertEqual(
+			self.__datedetector.getTime("01-12-2005 00:00:00")[:3],
+			[2005, 12, 1])
+
+	def testDropNonMatchingTemplates(self):
+		self.assertTrue(len(self.__datedetector.getTemplates()) > 10)
+		for _ in xrange(0, 50):
+			self.__datedetector.getTime("01-12-2005 00:00:00")
+		self.__datedetector.sortTemplate()
+		self.assertTrue(1 < len(self.__datedetector.getTemplates()) < 5)
+		for _ in xrange(0, 200):
+			self.__datedetector.getTime("01-12-2005 00:00:00")
+		self.__datedetector.sortTemplate()
+		self.assertTrue(len(self.__datedetector.getTemplates()) == 1)
+
+	def testDropNonMatchingMultipleTemplates(self):
+		self.assertTrue(len(self.__datedetector.getTemplates()) > 10)
+		for _ in xrange(0, 25):
+			self.__datedetector.getTime("01-12-2005 00:00:00")
+			self.__datedetector.getTime("2005-12-01 00:00:00")
+		self.__datedetector.sortTemplate()
+		self.assertTrue(1 < len(self.__datedetector.getTemplates()) < 5)
+		for _ in xrange(0, 100):
+			self.__datedetector.getTime("01-12-2005 00:00:00")
+			self.__datedetector.getTime("2005-12-01 00:00:00")
+		self.__datedetector.sortTemplate()
+		self.assertTrue(len(self.__datedetector.getTemplates()) == 2)
 
 	def testDateDetectorTemplateOverlap(self):
 		patterns = [template.getPattern()

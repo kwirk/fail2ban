@@ -24,6 +24,7 @@ __license__ = "GPL"
 import time, logging
 
 from datetemplate import DatePatternRegex, DateTai64n, DateEpoch, DateISO8601
+from mytime import MyTime
 from threading import Lock
 
 # Gets the instance of the logger.
@@ -109,36 +110,36 @@ class DateDetector:
 	def matchTime(self, line, incHits=True):
 		self.__lock.acquire()
 		try:
+			matchedTemplates = []
 			for template in self.__templates:
 				match = template.matchDate(line)
-				if not match is None:
-					logSys.debug("Matched time template %s" % template.getName())
-					if incHits:
-						template.incHits()
-					return match
-			return None
+				if match is not None:
+					logSys.debug(
+						"Matched time template %s" % template.getName())
+					template.incPotentialHits()
+					matchedTemplates.append((
+						template,
+						time.mktime(template.getDate(line)),
+						match))
+			if matchedTemplates:
+				now = MyTime.time()
+				matchedTemplates.sort(
+					key=lambda x: (abs(now - x[1]), -len(x[2].string)))
+				if incHits:
+					matchedTemplates[0][0].incHits()
+				return matchedTemplates[0][1:]
+			else:
+				return None, None
 		finally:
 			self.__lock.release()
 
 	def getTime(self, line):
-		self.__lock.acquire()
-		try:
-			for template in self.__templates:
-				try:
-					date = template.getDate(line)
-					if date is None:
-						continue
-					logSys.debug("Got time using template %s" % template.getName())
-					return date
-				except ValueError:
-					pass
-			return None
-		finally:
-			self.__lock.release()
+		matchTime = self.matchTime(line)
+		return matchTime and list(time.localtime(matchTime[0]))
 
 	def getUnixTime(self, line):
-		date = self.getTime(line)
-		return date and time.mktime(tuple(date))
+		matchTime = self.matchTime(line)
+		return matchTime and matchTime[0]
 
 	##
 	# Sort the template lists using the hits score. This method is not called
@@ -148,8 +149,22 @@ class DateDetector:
 		self.__lock.acquire()
 		try:
 			logSys.debug("Sorting the template list")
-			self.__templates.sort(key=lambda x: x.getHits(), reverse=True)
+			self.__templates.sort(
+				key=lambda x: (x.getHits(), x.getPotentialHits()),
+				reverse=True)
 			t = self.__templates[0]
 			logSys.debug("Winning template: %s with %d hits" % (t.getName(), t.getHits()))
+			totalHits = sum(template.getHits() for template in self.__templates)
+			newTemplates = [t]
+			for template in self.__templates[1:]:
+				if totalHits >= 250:
+					if template.getHits() >= totalHits * 0.2:
+						newTemplates.append(template)
+				elif totalHits >= 50:
+					if template.getPotentialHits() >= totalHits * 0.1:
+						newTemplates.append(template)
+				else:
+					newTemplates.append(template)
+			self.__templates = newTemplates
 		finally:
 			self.__lock.release()

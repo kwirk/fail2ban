@@ -40,6 +40,7 @@ class DateTemplate:
 		self.__regex = ""
 		self.__cRegex = None
 		self.__hits = 0
+		self.__potentialHits = 0
 	
 	def setName(self, name):
 		self.__name = name
@@ -52,7 +53,7 @@ class DateTemplate:
 		if (wordBegin and not re.search(r'^\^', regex)):
 			regex = r'\b' + regex
 		self.__regex = regex
-		self.__cRegex = re.compile(regex, re.UNICODE)
+		self.__cRegex = re.compile(regex)
 		
 	def getRegex(self):
 		return self.__regex
@@ -65,6 +66,15 @@ class DateTemplate:
 
 	def resetHits(self):
 		self.__hits = 0
+
+	def getPotentialHits(self):
+		return self.__potentialHits
+
+	def incPotentialHits(self):
+		self.__potentialHits += 1
+
+	def resetPotentialHits(self):
+		self.__potentialHits = 0
 	
 	def matchDate(self, line):
 		dateMatch = self.__cRegex.search(line)

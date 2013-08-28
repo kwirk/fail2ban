@@ -73,7 +73,7 @@ class Filter(JailThread):
 		## Line buffer
 		self.__lineBuffer = []
 		## Store last time stamp, applicable for multi-line
-		self.__lastTimeLine = ""
+		self.__lastDate = None
 
 		self.dateDetector = DateDetector()
 		self.dateDetector.addDefaultTemplate()
@@ -350,22 +350,26 @@ class Filter(JailThread):
 		line = line.rstrip('\r\n')
 		logSys.log(7, "Working on line %r", line)
 
-		timeMatch = self.dateDetector.matchTime(line)
+		date, timeMatch = self.dateDetector.matchTime(line)
 		if timeMatch:
 			# Lets split into time part and log part of the line
 			timeLine = timeMatch.group()
-			self.__lastTimeLine = timeLine
+			self.__lastDate = date
 			# Lets leave the beginning in as well, so if there is no
 			# anchore at the beginning of the time regexp, we don't
 			# at least allow injection. Should be harmless otherwise
 			logLine  = line[:timeMatch.start()] + line[timeMatch.end():]
 		else:
-			timeLine = self.__lastTimeLine or line
+			date = self.__lastDate
 			logLine = line
 		self.__lineBuffer = ((self.__lineBuffer +
 				[logLine])[-self.__lineBufferSize:])
-		return self.findFailure(timeLine, "\n".join(self.__lineBuffer) + "\n",
-								returnRawHost, checkAllRegex)
+		return self.findFailure(
+			date,
+			"\n".join(self.__lineBuffer) + "\n",
+			returnRawHost,
+			checkAllRegex,
+			)
 
 	def processLineAndAdd(self, line):
 		"""Processes the line for failures and populates failManager
@@ -408,11 +412,10 @@ class Filter(JailThread):
 	# to find the logging time.
 	# @return a dict with IP and timestamp.
 
-	def findFailure(self, timeLine, logLine,
-			returnRawHost=False, checkAllRegex=False):
-		logSys.log(5, "Date: %r, message: %r", timeLine, logLine)
+	def findFailure(
+		self, date, logLine, returnRawHost=False, checkAllRegex=False):
+		logSys.log(5, "Date: %r, message: %r", date, logLine)
 		failList = list()
-		date = self.dateDetector.getUnixTime(timeLine)
 		# Iterates over all the regular expressions.
 		for failRegexIndex, failRegex in enumerate(self.__failRegex):
 			failRegex.search(logLine)
@@ -429,13 +432,13 @@ class Filter(JailThread):
 				logSys.log(7, "Matched %s", failRegex)
 				if date is None:
 					logSys.debug("Found a match for %r but no valid date/time "
-								 "found for %r. Please try setting a custom "
+								 "found. Please try setting a custom "
 								 "date pattern (see man page jail.conf(5)). "
 								 "If format is complex, please "
 								 "file a detailed issue on"
 								 " https://github.com/fail2ban/fail2ban/issues "
 								 "in order to get support for this format."
-								 % (logLine, timeLine))
+								 % logLine)
 				else:
 					self.__lineBuffer = failRegex.getUnmatchedLines()
 					try:

@@ -119,13 +119,13 @@ def mtimesleep():
 	pass
 
 old_TZ = os.environ.get('TZ', None)
-def setUpMyTime():
+def setUpMyTime(newTime=1124013600, newTZ='Europe/Zurich'):
 	# Set the time to a fixed, known value
 	# Sun Aug 14 12:00:00 CEST 2005
 	# yoh: we need to adjust TZ to match the one used by Cyril so all the timestamps match
-	os.environ['TZ'] = 'Europe/Zurich'
+	os.environ['TZ'] = newTZ
 	time.tzset()
-	MyTime.setTime(1124013600)
+	MyTime.setTime(newTime)
 
 def tearDownMyTime():
 	os.environ.pop('TZ')
