@@ -12,11 +12,11 @@ before_install:
 install:
   - pip install pyinotify
   - if [[ $TRAVIS_PYTHON_VERSION == 2.7 ]]; then sudo apt-get install -qq python-gamin; fi
-  - if [[ $TRAVIS_PYTHON_VERSION == 2.7 ]]; then pip install -q coveralls; fi
+  - pip install -q coveralls
 script:
-  - if [[ $TRAVIS_PYTHON_VERSION == 2.7 ]]; then export PYTHONPATH="$PYTHONPATH:/usr/share/pyshared:/usr/lib/pyshared/python2.7"; fi
-  - if [[ $TRAVIS_PYTHON_VERSION == 2.7 ]]; then coverage run --rcfile=.travis_coveragerc setup.py test; else python setup.py test; fi
+  - export PYTHONPATH="$PYTHONPATH:/usr/share/pyshared:/usr/lib/pyshared/python$TRAVIS_PYTHON_VERSION"
+  - coverage run --rcfile=.travis_coveragerc setup.py test
 after_success:
 # Coverage config file must be .coveragerc for coveralls
-  - if [[ $TRAVIS_PYTHON_VERSION == 2.7 ]]; then cp -v .travis_coveragerc .coveragerc; fi
-  - if [[ $TRAVIS_PYTHON_VERSION == 2.7 ]]; then coveralls; fi
+  - cp -v .travis_coveragerc .coveragerc
+  - coveralls
