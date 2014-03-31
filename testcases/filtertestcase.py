@@ -557,6 +557,7 @@ def get_monitor_failures_testcase(Filter_):
 			_copy_lines_between_files(GetFailures.FILENAME_01, self.name + '.new',
 									  n=100).close()
 			os.rename(self.name + '.new', self.name)
+			self.file = open(self.name) # Open the new file
 			self.assert_correct_last_attempt(GetFailures.FAILURES_01)
 			self.assertEqual(self.filter.failManager.getFailTotal(), 6)
 
