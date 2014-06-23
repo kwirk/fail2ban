@@ -237,6 +237,12 @@ class JailReaderTest(LogCaptureTestCase):
 		result = JailReader.extractOptions(option)
 		self.assertEqual(expected, result)
 
+	def testSplitOptionMultiline(self):
+		action = "mail-whois-lines[logpath=/a/b\n/c/d]"
+		expected = ('mail-whois-lines', {'logpath': '/a/b\n/c/d'})
+		result = JailReader.extractOptions(action)
+		self.assertEquals(expected, result)
+
 	def testGlob(self):
 		d = tempfile.mkdtemp(prefix="f2b-temp")
 		# Generate few files
@@ -556,5 +562,39 @@ filter = testfilter1
 
 		# Python actions should not be passed `actname`
 		self.assertEqual(add_actions[-1][-1], "{}")
+
+		shutil.rmtree(basedir)
+
+	def testMultipleLineAction(self):
+		basedir = tempfile.mkdtemp("fail2ban_conf")
+		os.mkdir(os.path.join(basedir, "filter.d"))
+		os.mkdir(os.path.join(basedir, "action.d"))
+		open(os.path.join(basedir, "action.d", "testaction1.conf"), 'w').close()
+		open(os.path.join(basedir, "action.d", "testaction2.conf"), 'w').close()
+		open(os.path.join(basedir, "action.d", "testaction3.conf"), 'w').close()
+		open(os.path.join(basedir, "filter.d", "testfilter1.conf"), 'w').close()
+		jailfd = open(os.path.join(basedir, "jail.conf"), 'w')
+		jailfd.write("""
+[testjail1]
+enabled = true
+filter = testfilter1
+logpath_ = string1
+		   string2
+action = testaction1[logpath=%(logpath_)s]
+		 testaction2
+		 testaction3[logpath=%(logpath_)s]
+""")
+		jailfd.close()
+		jails = JailsReader(basedir=basedir)
+		self.assertTrue(jails.read())
+		self.assertTrue(jails.getOptions())
+		comm_commands = jails.convert(allow_no_files=True)
+
+		self.assertTrue(
+			['set', 'testjail1', 'action', 'testaction1', 'logpath', 'string1\nstring2'] in comm_commands)
+		self.assertTrue(
+			['set', 'testjail1', 'addaction', 'testaction2'] in comm_commands)
+		self.assertTrue(
+			['set', 'testjail1', 'action', 'testaction3', 'logpath', 'string1\nstring2'] in comm_commands)
 
 		shutil.rmtree(basedir)

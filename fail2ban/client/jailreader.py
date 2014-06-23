@@ -37,9 +37,13 @@ logSys = getLogger(__name__)
 
 class JailReader(ConfigReader):
 	
-	optionCRE = re.compile("^((?:\w|-|_|\.)+)(?:\[(.*)\])?$")
+	optionSplitRE = re.compile(
+		r'^((?:\w|-|_|\.)+(?:\[.*?\])?)$', re.DOTALL | re.MULTILINE)
+	optionCRE = re.compile(
+		r'^((?:\w|-|_|\.)+)(?:\[(.*?)\])?$', re.DOTALL | re.MULTILINE)
 	optionExtractRE = re.compile(
-		r'([\w\-_\.]+)=(?:"([^"]*)"|\'([^\']*)\'|([^,]*))(?:,|$)')
+		r'([\w\-_\.]+)=(?:"([^"]*)"|\'([^\']*)\'|([^,]*))(?:,|$)',
+		re.DOTALL | re.MULTILINE)
 	
 	def __init__(self, name, force_enable=False, **kwargs):
 		ConfigReader.__init__(self, **kwargs)
@@ -123,9 +127,9 @@ class JailReader(ConfigReader):
 				logSys.warning("No filter set for jail %s" % self.__name)
 		
 			# Read action
-			for act in self.__opts["action"].split('\n'):
+			for act in JailReader.optionSplitRE.split(self.__opts["action"]):
 				try:
-					if not act:			  # skip empty actions
+					if not act.strip(): # skip empty actions
 						continue
 					actName, actOpt = JailReader.extractOptions(act)
 					if actName.endswith(".py"):
@@ -149,7 +153,7 @@ class JailReader(ConfigReader):
 						else:
 							raise AttributeError("Unable to read action")
 				except Exception, e:
-					logSys.error("Error in action definition " + act)
+					logSys.error("Error in action definition %r", act)
 					logSys.debug("Caught exception: %s" % (e,))
 					return False
 			if not len(self.__actions):
@@ -224,8 +228,7 @@ class JailReader(ConfigReader):
 	def extractOptions(option):
 		match = JailReader.optionCRE.match(option)
 		if not match:
-			# TODO proper error handling
-			return None, None
+			raise ValueError("Invalid definition: %r" % option)
 		option_name, optstr = match.groups()
 		option_opts = dict()
 		if optstr:
